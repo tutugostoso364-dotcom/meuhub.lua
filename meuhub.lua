@@ -4,6 +4,7 @@ local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService") -- Adicionado para detectar o clique da mira
 
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
@@ -57,54 +58,74 @@ PlayerTab:CreateSlider({
 })
 
 ------------------------------------------------
--- RGB HIGHLIGHT (Contorno do Personagem)
+-- RGB HIGHLIGHT (Contorno de TODOS os Personagens)
 ------------------------------------------------
 
 local hitboxOn = false
-local highlights = {}
+local connections = {} -- Guarda os eventos para não dar lag
 
-local function createHighlight(char)
+local function applyHighlight(char)
     if not char then return end
+    
+    -- Se já tiver um Highlight antigo, remove para não acumular
+    local oldHl = char:FindFirstChildOfClass("Highlight")
+    if oldHl then oldHl:Destroy() end
 
-    -- Usa Highlight para contornar o corpo em vez de criar uma caixa fixa
     local hl = Instance.new("Highlight")
     hl.Adornee = char
     hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    hl.FillTransparency = 0.5 -- Transparência do preenchimento de dentro
-    hl.OutlineTransparency = 0 -- Contorno totalmente visível
+    hl.FillTransparency = 0.5
+    hl.OutlineTransparency = 0
     hl.Parent = char
 
     local hue = 0
-    local connection
-    connection = RunService.RenderStepped:Connect(function()
+    local renderConn
+    renderConn = RunService.RenderStepped:Connect(function()
         if hl.Parent and char:FindFirstChild("Humanoid") then
             hue = hue + 0.01
             local color = Color3.fromHSV(hue % 1, 1, 1)
             hl.FillColor = color
             hl.OutlineColor = color
         else
-            connection:Disconnect()
+            renderConn:Disconnect()
         end
     end)
-
-    table.insert(highlights, hl)
 end
 
 local function enableBoxes()
+    -- Aplica em todo mundo que já está no servidor
     for _, p in pairs(Players:GetPlayers()) do
-        if p ~= player and p.Character then
-            createHighlight(p.Character)
+        if p ~= player then
+            if p.Character then
+                applyHighlight(p.Character)
+            end
+            
+            -- Detecta quando esse jogador morrer e renascer para reaplicar o efeito!
+            local conn = p.CharacterAdded:Connect(function(char)
+                if hitboxOn then
+                    task.wait(0.5) -- Espera o boneco carregar completamente
+                    applyHighlight(char)
+                end
+            end)
+            table.insert(connections, conn)
         end
     end
 end
 
 local function disableBoxes()
-    for _, hl in pairs(highlights) do
-        if hl then
-            hl:Destroy()
+    -- Desconecta os eventos de spawn
+    for _, conn in pairs(connections) do
+        if conn then conn:Disconnect() end
+    end
+    connections = {}
+
+    -- Remove o visual de todos os bonecos do mapa
+    for _, p in pairs(Players:GetPlayers()) do
+        if p.Character then
+            local hl = p.Character:FindFirstChildOfClass("Highlight")
+            if hl then hl:Destroy() end
         end
     end
-    highlights = {}
 end
 
 VisualTab:CreateToggle({
@@ -120,21 +141,37 @@ VisualTab:CreateToggle({
     end
 })
 
--- Monitora novos jogadores entrando para aplicar o contorno se o toggle estiver ativo
+-- Cuida de novos jogadores que entrarem no servidor depois que você já abriu o menu
 Players.PlayerAdded:Connect(function(p)
-    p.CharacterAdded:Connect(function(char)
+    local conn = p.CharacterAdded:Connect(function(char)
         if hitboxOn then
-            task.wait(0.5) -- Pequena espera para carregar o boneco completo
-            createHighlight(char)
+            task.wait(0.5)
+            applyHighlight(char)
         end
     end)
+    if hitboxOn then table.insert(connections, conn) end
 end)
 
 ------------------------------------------------
--- AIM NO CORPO (Com checagem de Vida)
+-- AIM NO CORPO (Apenas ao Mirar / Segurar Botão Direito)
 ------------------------------------------------
 
 local aimOn = false
+local holdingAimButton = false -- Controla se você está segurando o botão de mira
+
+-- Detecta quando aperta e solta o Botão Direito do Mouse (MouseButton2)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        holdingAimButton = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        holdingAimButton = false
+    end
+end)
 
 local function getClosestPlayer()
     local closest = nil
@@ -145,12 +182,11 @@ local function getClosestPlayer()
             local root = p.Character:FindFirstChild("HumanoidRootPart")
             local humanoid = p.Character:FindFirstChild("Humanoid")
 
-            -- Verifica se o jogador tem o root, a humanoid e se ele está VIVO (Health > 0)
+            -- Verifica se o inimigo está vivo
             if root and humanoid and humanoid.Health > 0 then
                 local screen, onScreen = camera:WorldToViewportPoint(root.Position)
 
                 if onScreen then
-                    -- Mede a distância em relação ao centro da sua tela (mira)
                     local mousePos = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
                     local targetPos = Vector2.new(screen.X, screen.Y)
                     local mag = (targetPos - mousePos).Magnitude
@@ -176,10 +212,10 @@ AimTab:CreateToggle({
 })
 
 RunService.RenderStepped:Connect(function()
-    if aimOn then
+    -- Só vai mirar se o Script estiver Ativado E você estiver segurando o Botão Direito do mouse
+    if aimOn and holdingAimButton then
         local target = getClosestPlayer()
 
-        -- Se encontrou um alvo válido e vivo, aponta a câmera para ele
         if target and target.Parent and target.Parent:FindFirstChild("Humanoid") and target.Parent.Humanoid.Health > 0 then
             camera.CFrame = CFrame.lookAt(
                 camera.CFrame.Position,

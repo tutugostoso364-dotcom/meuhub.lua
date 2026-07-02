@@ -1,77 +1,73 @@
--- FPS TEST HUB - MOBILE V4 (Sincronizado com Disparo)
+-- FPS TEST HUB - MOBILE PRO (Versão Definitiva)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
-local Window = Rayfield:CreateWindow({Name = "FPS HUB - MOBILE", LoadingTitle = "Configurando...", LoadingSubtitle = "Modo Combate"})
+local Window = Rayfield:CreateWindow({Name = "FPS HUB MOBILE PRO", LoadingTitle = "Inicializando...", LoadingSubtitle = "Sincronizado"})
 local VisualTab = Window:CreateTab("Visual", 4483362458)
 local AimTab = Window:CreateTab("Aim", 4483362458)
 
 local aimOn = false
 local hitboxOn = false
-local isFiring = false
 
 ------------------------------------------------
--- DETECÇÃO DE DISPARO NO MOBILE
+-- SISTEMA DE HITBOX (Sempre On para novos players)
 ------------------------------------------------
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        isFiring = true
+local function applyHighlight(char)
+    if char and not char:FindFirstChild("Highlight") then
+        local hl = Instance.new("Highlight")
+        hl.Adornee = char
+        hl.FillTransparency = 0.4
+        hl.OutlineTransparency = 0
+        hl.Parent = char
+        
+        -- Loop para o efeito RGB contínuo
+        task.spawn(function()
+            while hl.Parent do
+                local hue = tick() % 5 / 5
+                hl.FillColor = Color3.fromHSV(hue, 1, 1)
+                hl.OutlineColor = Color3.fromHSV(hue, 1, 1)
+                task.wait(0.1)
+            end
+        end)
     end
-end)
+end
 
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-        isFiring = false
+-- Monitorar quem entra e quem spawna
+local function setupPlayer(p)
+    if p ~= player then
+        p.CharacterAdded:Connect(function(char)
+            if hitboxOn then task.wait(0.5); applyHighlight(char) end
+        end)
+        if p.Character then applyHighlight(p.Character) end
     end
-end)
+end
 
-------------------------------------------------
--- VISUAL: HITBOX RGB (Global)
-------------------------------------------------
+-- Rodar em todos os jogadores atuais
+Players.PlayerAdded:Connect(setupPlayer)
+for _, p in pairs(Players:GetPlayers()) do setupPlayer(p) end
+
 VisualTab:CreateToggle({
-    Name = "🌈 RGB em Todos",
+    Name = "🌈 RGB em Todos os Players",
     CurrentValue = false,
     Callback = function(v)
         hitboxOn = v
+        if v then
+            for _, p in pairs(Players:GetPlayers()) do if p.Character then applyHighlight(p.Character) end end
+        else
+            for _, p in pairs(Players:GetPlayers()) do if p.Character then local h = p.Character:FindFirstChild("Highlight") if h then h:Destroy() end end end
+        end
     end
 })
 
-RunService.RenderStepped:Connect(function()
-    if hitboxOn then
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                local hl = p.Character:FindFirstChildOfClass("Highlight")
-                if not hl then
-                    hl = Instance.new("Highlight")
-                    hl.Adornee = p.Character
-                    hl.FillTransparency = 0.5
-                    hl.Parent = p.Character
-                end
-                local hue = (tick() % 5) / 5
-                hl.FillColor = Color3.fromHSV(hue, 1, 1)
-                hl.OutlineColor = Color3.fromHSV(hue, 1, 1)
-            end
-        end
-    else
-        for _, p in pairs(Players:GetPlayers()) do
-            if p.Character then
-                local hl = p.Character:FindFirstChildOfClass("Highlight")
-                if hl then hl:Destroy() end
-            end
-        end
-    end
-end)
-
 ------------------------------------------------
--- AIMBOT: Ativa SÓ QUANDO ATIRA
+-- AIMBOT (Automático ao mirar)
 ------------------------------------------------
 AimTab:CreateToggle({
-    Name = "🎯 Aim (Gruda ao Atirar)",
+    Name = "🎯 Aimbot Automático",
     CurrentValue = false,
     Callback = function(v)
         aimOn = v
@@ -79,19 +75,20 @@ AimTab:CreateToggle({
 })
 
 RunService.RenderStepped:Connect(function()
-    -- Agora ele gruda APENAS se o toggle estiver ligado E você estiver apertando para atirar/mirar
-    if aimOn and isFiring then
+    if aimOn then
         local closest = nil
         local dist = math.huge
+        local center = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
         
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                 local hum = p.Character:FindFirstChild("Humanoid")
-                -- Só trava em quem está vivo
                 if hum and hum.Health > 0 then
                     local pos, onScreen = camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
-                    if onScreen then
-                        local magnitude = (Vector2.new(pos.X, pos.Y) - Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)).Magnitude
+                    local magnitude = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    
+                    -- Se o jogador estiver na tela e for o mais próximo do centro
+                    if onScreen and magnitude < 300 then -- 300 é o tamanho do seu "campo de visão"
                         if magnitude < dist then
                             closest = p.Character.HumanoidRootPart
                             dist = magnitude
@@ -102,11 +99,10 @@ RunService.RenderStepped:Connect(function()
         end
         
         if closest then
-            -- Suaviza a mira para não parecer robótico
-            local lerpSpeed = 0.2 
-            camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(camera.CFrame.Position, closest.Position), lerpSpeed)
+            -- Faz o puxão suave para o alvo
+            camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(camera.CFrame.Position, closest.Position), 0.15)
         end
     end
 end)
 
-print("FPS HUB MOBILE V4 carregado!")
+print("FPS HUB MOBILE PRO carregado!")

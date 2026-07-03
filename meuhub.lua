@@ -1,4 +1,4 @@
--- BRAYAN HUB - MOBILE PRO (Versão v13.8 - Varredura Global de Partida)
+-- BRAYAN HUB - MOBILE PRO (Versão v14.0 - Fast Smooth Aimbot)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -6,7 +6,7 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
-local Window = Rayfield:CreateWindow({Name = "Brayan Hub", LoadingTitle = "Inicializando...", LoadingSubtitle = "Sincronizado v13.8"})
+local Window = Rayfield:CreateWindow({Name = "Brayan Hub", LoadingTitle = "Inicializando...", LoadingSubtitle = "Sincronizado v14.0"})
 local VisualTab = Window:CreateTab("Visual", 4483362458)
 local AimTab = Window:CreateTab("Aim", 4483362458)
 
@@ -74,7 +74,7 @@ AimTab:CreateToggle({
 })
 
 AimTab:CreateToggle({
-    Name = "👁️ Aimbot 2 (Foco Total na Tela)",
+    Name = "⚡ Aimbot 2 (Grudar Instantâneo - Rápido)",
     CurrentValue = false,
     Callback = function(v) aim2On = v end
 })
@@ -113,12 +113,10 @@ setreadonly(gmt, true)
 ------------------------------------------------
 -- FUNÇÃO DE VERIFICAÇÃO DE JOGADOR REAL
 ------------------------------------------------
--- Associa um modelo encontrado no Workspace a um jogador real para evitar mirar em NPCs ou aliados
 local function getPlayerFromCharacter(char)
     local p = Players:GetPlayerFromCharacter(char)
     if p then return p end
     
-    -- Segunda tentativa caso o jogo clone o boneco separadamente
     for _, pl in pairs(Players:GetPlayers()) do
         if pl.Name == char.Name then
             return pl
@@ -143,20 +141,18 @@ RunService.RenderStepped:Connect(function()
     globalClosestHead2 = nil
 
     ------------------------------------------------
-    -- NOVO LOOP DETECTOR: PROCURA EM TODO O ESPAÇO DO JOGO
+    -- LOOP DETECTOR DE PARTIDA
     ------------------------------------------------
     for _, obj in pairs(workspace:GetDescendants()) do
-        -- Verifica se o objeto se comporta como um personagem e não é você mesmo
         if obj:IsA("Model") and obj ~= player.Character then
             local head = obj:FindFirstChild("Head")
             local hum = obj:FindFirstChildOfClass("Humanoid")
             local root = obj:FindFirstChild("HumanoidRootPart")
             
             if head and hum and root and hum.Health > 0 then
-                -- Descobre quem é o dono desse boneco na partida
                 local targetPlayer = getPlayerFromCharacter(obj)
                 
-                -- 1. SISTEMA VISUAL (ESP e Highlight adaptáveis)
+                -- 1. SISTEMA VISUAL
                 if visualsOn then
                     local hl = obj:FindFirstChild("Brayan_Hub_Highlight")
                     if not hl then
@@ -229,15 +225,17 @@ RunService.RenderStepped:Connect(function()
     end
 
     ------------------------------------------------
-    -- 3. EXECUÇÃO DOS AIMBOTS
+    -- 3. EXECUÇÃO DOS AIMBOTS (VELOCIDADE AJUSTADA)
     ------------------------------------------------
     if aimOn and globalClosestHead then
+        -- Aimbot 1 Original (Suavidade normal)
         local targetCFrame = CFrame.lookAt(camera.CFrame.Position, globalClosestHead.Position)
         camera.CFrame = camera.CFrame:Lerp(targetCFrame, 0.16)
     elseif aim2On and globalClosestHead2 then
+        -- Aimbot 2 Novo (Ajustado para grudar instantâneo e ultra rápido)
         local targetCFrame2 = CFrame.lookAt(camera.CFrame.Position, globalClosestHead2.Position)
-        camera.CFrame = camera.CFrame:Lerp(targetCFrame2, 0.16)
+        camera.CFrame = camera.CFrame:Lerp(targetCFrame2, 0.85)
     end
 end)
 
-print("Brayan Hub v13.8 Carregado - Bypass de Pasta de Partida Ativo!")
+print("Brayan Hub v14.0 Carregado - Aimbot 2 Acelerado para 0.85!")

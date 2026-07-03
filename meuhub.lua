@@ -1,4 +1,4 @@
--- FPS HUB MOBILE PRO - V6.7 (Foco: Aimbot Humanoid Suave)
+-- FPS TEST HUB - MOBILE PRO (Versão Definitiva)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -6,7 +6,7 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
-local Window = Rayfield:CreateWindow({Name = "FPS HUB MOBILE PRO", LoadingTitle = "Inicializando...", LoadingSubtitle = "V6.7 - Humanoid Focus"})
+local Window = Rayfield:CreateWindow({Name = "FPS HUB MOBILE PRO", LoadingTitle = "Inicializando...", LoadingSubtitle = "Sincronizado"})
 local VisualTab = Window:CreateTab("Visual", 4483362458)
 local AimTab = Window:CreateTab("Aim", 4483362458)
 
@@ -14,58 +14,95 @@ local aimOn = false
 local hitboxOn = false
 
 ------------------------------------------------
--- 1. HITBOX RGB (FIXO)
+-- SISTEMA DE HITBOX (Sempre On para novos players)
 ------------------------------------------------
-VisualTab:CreateToggle({Name = "🌈 RGB Permanente", CurrentValue = false, Callback = function(v) hitboxOn = v end})
-
-RunService.RenderStepped:Connect(function()
-    if hitboxOn then
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= player and p.Character then
-                if not p.Character:FindFirstChild("Highlight") then
-                    local hl = Instance.new("Highlight", p.Character)
-                    hl.FillTransparency = 0.4
-                end
-                p.Character.Highlight.FillColor = Color3.fromHSV(tick() % 5 / 5, 1, 1)
+local function applyHighlight(char)
+    if char and not char:FindFirstChild("Highlight") then
+        local hl = Instance.new("Highlight")
+        hl.Adornee = char
+        hl.FillTransparency = 0.4
+        hl.OutlineTransparency = 0
+        hl.Parent = char
+        
+        -- Loop para o efeito RGB contínuo
+        task.spawn(function()
+            while hl.Parent do
+                local hue = tick() % 5 / 5
+                hl.FillColor = Color3.fromHSV(hue, 1, 1)
+                hl.OutlineColor = Color3.fromHSV(hue, 1, 1)
+                task.wait(0.1)
             end
+        end)
+    end
+end
+
+-- Monitorar quem entra e quem spawna
+local function setupPlayer(p)
+    if p ~= player then
+        p.CharacterAdded:Connect(function(char)
+            if hitboxOn then task.wait(0.5); applyHighlight(char) end
+        end)
+        if p.Character then applyHighlight(p.Character) end
+    end
+end
+
+-- Rodar em todos os jogadores atuais
+Players.PlayerAdded:Connect(setupPlayer)
+for _, p in pairs(Players:GetPlayers()) do setupPlayer(p) end
+
+VisualTab:CreateToggle({
+    Name = "🌈 RGB em Todos os Players",
+    CurrentValue = false,
+    Callback = function(v)
+        hitboxOn = v
+        if v then
+            for _, p in pairs(Players:GetPlayers()) do if p.Character then applyHighlight(p.Character) end end
+        else
+            for _, p in pairs(Players:GetPlayers()) do if p.Character then local h = p.Character:FindFirstChild("Highlight") if h then h:Destroy() end end end
         end
     end
-end)
+})
 
 ------------------------------------------------
--- 2. AIMBOT (Detector de Humanoid + Suavização)
+-- AIMBOT (Automático ao mirar)
 ------------------------------------------------
-AimTab:CreateToggle({Name = "🎯 Aimbot Humanoid (Lock Suave)", CurrentValue = false, Callback = function(v) aimOn = v end})
+AimTab:CreateToggle({
+    Name = "🎯 Aimbot Automático",
+    CurrentValue = false,
+    Callback = function(v)
+        aimOn = v
+    end
+})
 
 RunService.RenderStepped:Connect(function()
-    if not aimOn then return end
-    
-    local closest, dist = nil, 9999
-    
-    for _, p in pairs(Players:GetPlayers()) do
-        -- Verifica se o jogador tem Humanoid e se está vivo
-        if p ~= player and p.Character then
-            local root = p.Character:FindFirstChild("HumanoidRootPart")
-            local hum = p.Character:FindFirstChild("Humanoid")
-            
-            if root and hum and hum.Health > 0 then
-                local pos, onScreen = camera:WorldToViewportPoint(root.Position)
-                if onScreen then
-                    local mag = (Vector2.new(pos.X, pos.Y) - Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)).Magnitude
-                    if mag < dist then
-                        closest = root
-                        dist = mag
+    if aimOn then
+        local closest = nil
+        local dist = math.huge
+        local center = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
+        
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                local hum = p.Character:FindFirstChild("Humanoid")
+                if hum and hum.Health > 0 then
+                    local pos, onScreen = camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
+                    local magnitude = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    
+                    -- Se o jogador estiver na tela e for o mais próximo do centro
+                    if onScreen and magnitude < 300 then -- 300 é o tamanho do seu "campo de visão"
+                        if magnitude < dist then
+                            closest = p.Character.HumanoidRootPart
+                            dist = magnitude
+                        end
                     end
                 end
             end
         end
-    end
-
-    if closest then
-        -- Suavização constante (0.15 é o ponto ideal para não bugar tiros)
-        local targetCFrame = CFrame.lookAt(camera.CFrame.Position, closest.Position)
-        camera.CFrame = camera.CFrame:Lerp(targetCFrame, 0.15)
+        
+        if closest then
+            -- Faz o puxão suave para o alvo
+            camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(camera.CFrame.Position, closest.Position), 0.15)
+        end
     end
 end)
 
-print("FPS HUB MOBILE PRO V6.7 (Humanoid Focus) Carregado!")
+print("FPS HUB MOBILE PRO carregado!")

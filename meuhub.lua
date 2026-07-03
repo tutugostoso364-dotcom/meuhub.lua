@@ -92,19 +92,12 @@ UserInputService.InputBegan:Connect(function(input, gpe)
                 local root = p.Character.HumanoidRootPart
                 local dist = (root.Position - player.Character.HumanoidRootPart.Position).Magnitude
                 if dist < 20 then
-                    -- Detecta o fim do mapa (altura do void) e calcula a direção
-                    local voidHeight = workspace.FallenPartsDestroyHeight
-                    local targetPos = Vector3.new(root.Position.X, voidHeight - 50, root.Position.Z)
-                    local direction = (targetPos - root.Position).Unit
-
                     local att = Instance.new("Attachment", root)
                     local vel = Instance.new("LinearVelocity", root)
                     vel.MaxForce = Vector3.new(1,1,1) * 999999999
-                    
-                    -- Aplica a força de 500 direto para baixo do fim do mapa
-                    vel.VectorVelocity = direction * 500
+                    -- Força lateral 200 + Força vertical 75 para não enterrar
+                    vel.VectorVelocity = (root.Position - player.Character.HumanoidRootPart.Position).Unit * 200 + Vector3.new(0, 75, 0)
                     vel.Attachment0 = att
-                    
                     game:GetService("Debris"):AddItem(vel, 0.4)
                     game:GetService("Debris"):AddItem(att, 0.4)
                     p.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
@@ -115,25 +108,3 @@ UserInputService.InputBegan:Connect(function(input, gpe)
 end)
 
 print("FPS HUB MOBILE PRO V6 Carregado!")
-if dist < 25 then
-                    local voidHeight = Workspace.FallenPartsDestroyHeight
-                    local targetPos = Vector3.new(root.Position.X, voidHeight - 50, root.Position.Z)
-                    local direction = (targetPos - root.Position).Unit
-                    
-                    local att = Instance.new("Attachment", root)
-                    local vel = Instance.new("LinearVelocity", root)
-                    vel.MaxForce = Vector3.new(1,1,1) * 999999999
-                    vel.VectorVelocity = direction * 500
-                    vel.Attachment0 = att
-                    
-                    game:GetService("Debris"):AddItem(vel, 0.5)
-                    game:GetService("Debris"):AddItem(att, 0.5)
-                    p.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-                end
-            end
-        end
-    end
-end)
-
-Rayfield:LoadConfiguration()
-print("Menu carregado com sucesso!")

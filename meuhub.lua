@@ -1,4 +1,4 @@
--- BRAYAN HUB - MOBILE PRO (Versão v10.0 - Auto Head Lock + ESP + Safe Bullet Bypass)
+-- BRAYAN HUB - MOBILE PRO (Versão v11.0 - Wallbang Pro Filter)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -6,7 +6,7 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
-local Window = Rayfield:CreateWindow({Name = "Brayan Hub", LoadingTitle = "Inicializando...", LoadingSubtitle = "Sincronizado v10.0"})
+local Window = Rayfield:CreateWindow({Name = "Brayan Hub", LoadingTitle = "Inicializando...", LoadingSubtitle = "Sincronizado v11.0"})
 local VisualTab = Window:CreateTab("Visual", 4483362458)
 local AimTab = Window:CreateTab("Aim", 4483362458)
 
@@ -69,7 +69,7 @@ AimTab:CreateToggle({
 })
 
 AimTab:CreateToggle({
-    Name = "🧱 Bala Mágicas (Atravessar Sem Cair)",
+    Name = "🧱 Bala Mágica (Apenas Paredes)",
     CurrentValue = false,
     Callback = function(v) magicBulletOn = v end
 })
@@ -85,41 +85,36 @@ RunService.RenderStepped:Connect(function()
     local closestHead = nil
     local shortestDist = math.huge
 
-    -- Coleta o personagem local para o sistema anti-queda da Bala Mágica
-    local myChar = player.Character
-    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-
     ------------------------------------------------
-    -- LÓGICA DA BALA MÁGICA INTELIGENTE (ANTI-QUEDA)
+    -- NOVA LÓGICA DE FILTRAGEM DA BALA MÁGICA
     ------------------------------------------------
-    if magicBulletOn and myRoot then
-        -- Procura por objetos ao redor do mapa
+    if magicBulletOn then
         for _, obj in pairs(workspace:GetDescendants()) do
             if obj:IsA("BasePart") then
                 local name = obj.Name:lower()
-                -- Proteção básica para o chão principal do mapa não sumir nunca
-                if not name:find("floor") and not name:find("ground") and not name:find("baseplate") and not name:find("terrain") then
+                
+                -- FILTRO SELETIVO: Se for chão, rampa, caixa, escada ou terreno, IGNORA (Mantém Sólido)
+                if name:find("floor") or name:find("ground") or name:find("baseplate") or 
+                   name:find("ramp") or name:find("rampa") or name:find("box") or 
+                   name:find("caixa") or name:find("stair") or name:find("escada") or 
+                   name:find("step") or obj.ClassName == "Terrain" then
                     
-                    -- Calcula a distância entre o objeto e o pé/base do seu jogador
-                    local distanceToMe = (obj.Position - myRoot.Position).Magnitude
-                    
-                    if distanceToMe < 6 then
-                        -- Se estiver colado em você ou no seu pé, mantém sólido para você não cair ou bugar nas paredes
-                        obj.CanCollide = true
-                    else
-                        -- Se estiver longe de você, fica sem colisão para a sua bala passar direto!
+                    obj.CanCollide = true
+                else
+                    -- Se o nome indicar parede ou se for uma estrutura vertical genérica, desativa a colisão para a bala passar
+                    if name:find("wall") or name:find("parede") or name:find("brick") or name:find("glass") or obj.Size.Y > obj.Size.X then
                         obj.CanCollide = false
                     end
                 end
             end
         end
-    elseif not magicBulletOn then
-        -- Se desligar a bala mágica, o script restaura a física padrão do mapa imediatamente
+    else
+        -- Se desligar, força tudo a voltar ao normal
         for _, obj in pairs(workspace:GetDescendants()) do
-            if obj:IsA("BasePart") and obj.Name ~= "Terrain" then
-                -- Restaura apenas o que não for do sistema nativo para evitar lags
-                if obj:GetAttribute("OriginalCollide") ~= nil then
-                    obj.CanCollide = obj:GetAttribute("OriginalCollide")
+            if obj:IsA("BasePart") and obj.ClassName ~= "Terrain" then
+                -- Ativa novamente as colisões padrão do mapa
+                if string.find(obj.Name:lower(), "wall") or string.find(obj.Name:lower(), "parede") then
+                    obj.CanCollide = true
                 end
             end
         end
@@ -173,7 +168,7 @@ RunService.RenderStepped:Connect(function()
                 if lines[p] then lines[p].Visible = false end
             end
 
-            -- 2. COLETA DE DADOS PARA O AIMBOT (Foco na Cabeça)
+            -- 2. AIMBOT (Foco na Cabeça)
             if aimOn and hum and hum.Health > 0 and head then
                 local pos, onScreen = camera:WorldToViewportPoint(head.Position)
                 if onScreen then
@@ -194,4 +189,4 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-print("Brayan Hub v10.0 Carregado - Bala Mágica Avançada Injetada!")
+print("Brayan Hub v11.0 carregado - Proteção Completa de Chão/Rampas!")

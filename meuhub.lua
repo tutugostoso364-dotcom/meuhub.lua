@@ -1,4 +1,4 @@
--- FPS HUB MOBILE PRO - VERSÃO COMPLETA E CORRIGIDA
+-- FPS HUB MOBILE PRO - VERSÃO COMPLETA E ATUALIZADA
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -13,11 +13,12 @@ local AimTab = Window:CreateTab("Aim", 4483362458)
 local CombatTab = Window:CreateTab("Combat", 4483362458)
 
 local aimOn = false
+local aimLockOn = false -- Nova variável para o Lock Instantâneo
 local hitboxOn = false
 local flingOn = false
 
 ------------------------------------------------
--- VISUAL: HITBOX RGB (Monitoramento Constante)
+-- VISUAL: HITBOX RGB
 ------------------------------------------------
 local function applyHighlight(char)
     if char and not char:FindFirstChild("Highlight") then
@@ -26,7 +27,6 @@ local function applyHighlight(char)
         hl.FillTransparency = 0.4
         hl.OutlineTransparency = 0
         hl.Parent = char
-        
         task.spawn(function()
             while hl.Parent do
                 local hue = tick() % 5 / 5
@@ -38,43 +38,38 @@ local function applyHighlight(char)
     end
 end
 
-VisualTab:CreateToggle({
-    Name = "🌈 RGB em Todos os Players",
-    CurrentValue = false,
-    Callback = function(v)
-        hitboxOn = v
-        if v then
-            for _, p in pairs(Players:GetPlayers()) do if p.Character then applyHighlight(p.Character) end end
-        else
-            for _, p in pairs(Players:GetPlayers()) do if p.Character then local h = p.Character:FindFirstChild("Highlight") if h then h:Destroy() end end end
-        end
-    end
-})
-
-Players.PlayerAdded:Connect(function(p)
-    p.CharacterAdded:Connect(function(char) if hitboxOn then task.wait(0.5); applyHighlight(char) end end)
-end)
+VisualTab:CreateToggle({Name = "🌈 RGB em Todos", CurrentValue = false, Callback = function(v) 
+    hitboxOn = v 
+    if v then for _, p in pairs(Players:GetPlayers()) do if p.Character then applyHighlight(p.Character) end end end
+end})
 
 ------------------------------------------------
--- AIMBOT: Automático ao Mirar
+-- AIMBOT: Opções de Suavização e Lock
 ------------------------------------------------
-AimTab:CreateToggle({Name = "🎯 Aimbot Automático", CurrentValue = false, Callback = function(v) aimOn = v end})
+AimTab:CreateToggle({Name = "🎯 Aimbot Suave (Original)", CurrentValue = false, Callback = function(v) aimOn = v end})
+AimTab:CreateToggle({Name = "🔒 Lock Automático (Grudar)", CurrentValue = false, Callback = function(v) aimLockOn = v end})
 
 RunService.RenderStepped:Connect(function()
-    if aimOn then
-        local closest, dist = nil, 500
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                local hum = p.Character:FindFirstChild("Humanoid")
-                if hum and hum.Health > 0 then
-                    local pos, onScreen = camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
-                    local mag = (Vector2.new(pos.X, pos.Y) - Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)).Magnitude
-                    if onScreen and mag < dist then closest = p.Character.HumanoidRootPart; dist = mag end
-                end
+    local closest, dist = nil, 500
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            local hum = p.Character:FindFirstChild("Humanoid")
+            if hum and hum.Health > 0 then
+                local pos, onScreen = camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
+                local mag = (Vector2.new(pos.X, pos.Y) - Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)).Magnitude
+                if onScreen and mag < dist then closest = p.Character.HumanoidRootPart; dist = mag end
             end
         end
-        if closest then
+    end
+
+    if closest then
+        -- Função 1: Aimbot Suave (Original)
+        if aimOn then
             camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(camera.CFrame.Position, closest.Position), 0.15)
+        end
+        -- Função 2: Lock Instantâneo (Nova)
+        if aimLockOn then
+            camera.CFrame = CFrame.lookAt(camera.CFrame.Position, closest.Position)
         end
     end
 end)
@@ -95,7 +90,6 @@ UserInputService.InputBegan:Connect(function(input, gpe)
                     local att = Instance.new("Attachment", root)
                     local vel = Instance.new("LinearVelocity", root)
                     vel.MaxForce = Vector3.new(1,1,1) * 999999999
-                    -- Força lateral 200 + Força vertical 75 para não enterrar
                     vel.VectorVelocity = (root.Position - player.Character.HumanoidRootPart.Position).Unit * 200 + Vector3.new(0, 75, 0)
                     vel.Attachment0 = att
                     game:GetService("Debris"):AddItem(vel, 0.4)
@@ -107,4 +101,4 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     end
 end)
 
-print("FPS HUB MOBILE PRO V6 Carregado!")
+print("FPS HUB MOBILE PRO V6.1 Carregado!")

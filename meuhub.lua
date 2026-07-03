@@ -14,17 +14,18 @@ local aimOn = false
 local hitboxOn = false
 
 ------------------------------------------------
--- SISTEMA DE HITBOX (Sempre On para novos players)
+-- SISTEMA DE HITBOX (Sempre On - Vivo ou Morto se tiver Humanoid)
 ------------------------------------------------
 local function applyHighlight(char)
-    if char and not char:FindFirstChild("Highlight") then
+    -- Verifica se o modelo do personagem possui um Humanoid antes de aplicar
+    if char and char:FindFirstChildOfClass("Humanoid") and not char:FindFirstChild("Highlight") then
         local hl = Instance.new("Highlight")
         hl.Adornee = char
         hl.FillTransparency = 0.4
         hl.OutlineTransparency = 0
         hl.Parent = char
         
-        -- Loop para o efeito RGB contínuo
+        -- Loop para o efeito RGB contínuo (roda mesmo se o humanoid morrer)
         task.spawn(function()
             while hl.Parent do
                 local hue = tick() % 5 / 5
@@ -36,19 +37,16 @@ local function applyHighlight(char)
     end
 end
 
--- Monitorar quem entra e quem spawna
-local function setupPlayer(p)
-    if p ~= player then
-        p.CharacterAdded:Connect(function(char)
-            if hitboxOn then task.wait(0.5); applyHighlight(char) end
-        end)
-        if p.Character then applyHighlight(p.Character) end
+-- Monitoramento constante via RenderStepped para garantir que corpos mortos ou recém-nascidos mantenham o RGB
+RunService.RenderStepped:Connect(function()
+    if hitboxOn then
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= player and p.Character then
+                applyHighlight(p.Character)
+            end
+        end
     end
-end
-
--- Rodar em todos os jogadores atuais
-Players.PlayerAdded:Connect(setupPlayer)
-for _, p in pairs(Players:GetPlayers()) do setupPlayer(p) end
+end)
 
 VisualTab:CreateToggle({
     Name = "🌈 RGB em Todos os Players",

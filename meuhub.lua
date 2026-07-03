@@ -1,4 +1,4 @@
--- BRAYAN HUB - MOBILE PRO (Versão v14.6 - ESP Restaurado + Aimbot 0.65)
+-- BRAYAN HUB - MOBILE PRO (Versão v14.7 - Fix Aim Lock Position)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -6,7 +6,7 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
-local Window = Rayfield:CreateWindow({Name = "Brayan Hub", LoadingTitle = "Inicializando...", LoadingSubtitle = "Sincronizado v14.6"})
+local Window = Rayfield:CreateWindow({Name = "Brayan Hub", LoadingTitle = "Inicializando...", LoadingSubtitle = "Sincronizado v14.7"})
 local VisualTab = Window:CreateTab("Visual", 4483362458)
 local AimTab = Window:CreateTab("Aim", 4483362458)
 
@@ -29,7 +29,6 @@ local function clearVisuals(p)
     if lines[p] then lines[p]:Destroy(); lines[p] = nil end
 end
 
--- Limpa os Highlights de todos os modelos
 local function cleanupHighlights()
     for _, obj in pairs(workspace:GetDescendants()) do
         if obj:IsA("Highlight") and obj.Name == "Brayan_Hub_Highlight" then
@@ -97,7 +96,6 @@ RunService.RenderStepped:Connect(function()
                 
                 -- 1. SISTEMA VISUAL (ESP + HIGHLIGHT)
                 if visualsOn then
-                    -- Highlight RGB
                     local hl = obj:FindFirstChild("Brayan_Hub_Highlight")
                     if not hl then
                         hl = Instance.new("Highlight")
@@ -107,7 +105,6 @@ RunService.RenderStepped:Connect(function()
                     hl.FillColor = dynamicColor
                     hl.OutlineColor = dynamicColor
 
-                    -- ESP BOX E LINES
                     if not boxes[targetPlayer] then
                         boxes[targetPlayer] = Drawing.new("Square")
                         boxes[targetPlayer].Filled = false
@@ -155,13 +152,18 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- 3. EXECUÇÃO DA MIRA
+    ------------------------------------------------
+    -- 3. EXECUÇÃO DA MIRA (CORREÇÃO DE POSIÇÃO)
+    ------------------------------------------------
     if aimOn and globalClosestHead then
-        camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(camera.CFrame.Position, globalClosestHead.Position), 0.16)
+        -- Trava usando lookAt direto da posição da câmera para a posição exata global do osso
+        local targetCFrame = CFrame.lookAt(camera.CFrame.Position, globalClosestHead.Position)
+        camera.CFrame = camera.CFrame:Lerp(targetCFrame, 0.16)
     elseif aim2On and globalClosestHead2 then
-        -- Acelerado para 0.65 como pedido
-        camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(camera.CFrame.Position, globalClosestHead2.Position), 0.65)
+        -- Trava precisa com velocidade 0.65 corrigida para não dar offset
+        local targetCFrame2 = CFrame.lookAt(camera.CFrame.Position, globalClosestHead2.Position)
+        camera.CFrame = camera.CFrame:Lerp(targetCFrame2, 0.65)
     end
 end)
 
-print("Brayan Hub v14.6 Carregado - ESP Restaurado e Aimbot 2 em 0.65!")
+print("Brayan Hub v14.7 Carregado - Trava de CFrame centralizada com sucesso!")

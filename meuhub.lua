@@ -1,4 +1,4 @@
--- BRAYAN HUB - MOBILE PRO (Versão v14.0 - Wallbang Pro + Fly Mobile)
+-- BRAYAN HUB - MOBILE PRO (Versão v15.0 - Loops Separados e Independentes)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -6,10 +6,10 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
-local Window = Rayfield:CreateWindow({Name = "Brayan Hub", LoadingTitle = "Inicializando...", LoadingSubtitle = "Sincronizado v14.0"})
+local Window = Rayfield:CreateWindow({Name = "Brayan Hub", LoadingTitle = "Inicializando...", LoadingSubtitle = "Sincronizado v15.0"})
 local VisualTab = Window:CreateTab("Visual", 4483362458)
 local AimTab = Window:CreateTab("Aim", 4483362458)
-local MoveTab = Window:CreateTab("Movement", 4483362458) -- Nova aba para o Fly
+local MoveTab = Window:CreateTab("Movement", 4483362458)
 
 local aimOn = false
 local visualsOn = false
@@ -80,14 +80,12 @@ AimTab:CreateToggle({
     Callback = function(v) magicBulletOn = v end
 })
 
--- Controles de Voo na nova aba
 MoveTab:CreateToggle({
     Name = "✈️ Ativar Fly (Voo de Câmera)",
     CurrentValue = false,
     Callback = function(v) 
         flyOn = v 
         if not v then
-            -- Limpa as forças físicas ao desligar o Fly
             if flyBodyVelocity then flyBodyVelocity:Destroy(); flyBodyVelocity = nil end
             if flyBodyGyro then flyBodyGyro:Destroy(); flyBodyGyro = nil end
             local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
@@ -133,7 +131,7 @@ end)
 setreadonly(gmt, true)
 
 ------------------------------------------------
--- LOOP PRINCIPAL UNIFICADO (RenderStepped)
+-- LOOP DE PROCESSAMENTO VISUAL E MIRA INDEPENDENTE
 ------------------------------------------------
 RunService.RenderStepped:Connect(function()
     local hue = tick() % 5 / 5
@@ -143,53 +141,14 @@ RunService.RenderStepped:Connect(function()
     local shortestDist = math.huge
     globalClosestHead = nil
 
-    local myChar = player.Character
-    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
-
-    ------------------------------------------------
-    -- LÓGICA DO FLY MOBILE INTELIGENTE
-    ------------------------------------------------
-    if flyOn and myRoot and myHum then
-        myHum.PlatformStand = true -- Desativa as animações de queda do Roblox para não bugar
-
-        -- Cria ou atualiza as forças físicas estáveis para segurar o boneco no ar
-        if not flyBodyVelocity then
-            flyBodyVelocity = Instance.new("BodyVelocity")
-            flyBodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-            flyBodyVelocity.Parent = myRoot
-        end
-
-        if not flyBodyGyro then
-            flyBodyGyro = Instance.new("BodyGyro")
-            flyBodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-            flyBodyGyro.Parent = myRoot
-        end
-
-        -- Alinha a rotação do corpo com a inclinação da sua câmera do celular
-        flyBodyGyro.CFrame = camera.CFrame
-
-        -- Verifica a direção que o direcional virtual do Mobile está mandando andar
-        local moveDirection = myHum.MoveDirection
-        if moveDirection.Magnitude > 0 then
-            -- Voa na direção para onde a Câmera aponta (Voo Direcional Completo)
-            flyBodyVelocity.Velocity = camera.CFrame.LookVector * (moveDirection.Magnitude * flySpeed)
-        else
-            -- Se soltar o analógico, o boneco trava perfeitamente estático no ar
-            flyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
-        end
-    end
-
-    ------------------------------------------------
-    -- LOOP DE JOGADORES (AIMBOT, RGB E ESP)
-    ------------------------------------------------
+    -- 1. PROCESSAMENTO DE JOGADORES (HITBOX, ESP, COLETA AIMBOT)
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= player and p.Character then
             local head = p.Character:FindFirstChild("Head")
             local hum = p.Character:FindFirstChildOfClass("Humanoid")
             local root = p.Character:FindFirstChild("HumanoidRootPart")
 
-            -- 1. SISTEMA VISUAL: HITBOX RGB INFINITA + ESP
+            -- Sistema Visual Isolado
             if visualsOn and hum and head and root then
                 local hl = p.Character:FindFirstChild("Brayan_Hub_Highlight")
                 if not hl then
@@ -228,7 +187,7 @@ RunService.RenderStepped:Connect(function()
                 if lines[p] then lines[p].Visible = false end
             end
 
-            -- 2. COLETA DE INIMIGOS (AIMBOT)
+            -- Coleta do Aimbot Isolada
             if hum and hum.Health > 0 and head then
                 local pos, onScreen = camera:WorldToViewportPoint(head.Position)
                 
@@ -249,11 +208,45 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- 3. EXECUÇÃO DO AIMBOT
+    -- 2. EXECUÇÃO DO AIMBOT (Totalmente fora do escopo do Fly)
     if aimOn and globalClosestHead then
         local targetCFrame = CFrame.lookAt(camera.CFrame.Position, globalClosestHead.Position)
         camera.CFrame = camera.CFrame:Lerp(targetCFrame, 0.16)
     end
 end)
 
-print("Brayan Hub v14.0 Carregado - Aba Movement e Fly Injetados!")
+------------------------------------------------
+-- LOOP EXCLUSIVO E ISOLADO DO FLY
+------------------------------------------------
+RunService.Heartbeat:Connect(function()
+    local myChar = player.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+
+    if flyOn and myRoot and myHum then
+        myHum.PlatformStand = true
+
+        if not flyBodyVelocity then
+            flyBodyVelocity = Instance.new("BodyVelocity")
+            flyBodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            flyBodyVelocity.Parent = myRoot
+        end
+
+        if not flyBodyGyro then
+            flyBodyGyro = Instance.new("BodyGyro")
+            flyBodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+            flyBodyGyro.Parent = myRoot
+        end
+
+        flyBodyGyro.CFrame = camera.CFrame
+        local moveDirection = myHum.MoveDirection
+        
+        if moveDirection.Magnitude > 0 then
+            flyBodyVelocity.Velocity = camera.CFrame.LookVector * (moveDirection.Magnitude * flySpeed)
+        else
+            flyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        end
+    end
+end)
+
+print("Brayan Hub v15.0 - Sistema Corrigido e Unificado!")

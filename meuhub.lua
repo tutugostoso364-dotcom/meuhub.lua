@@ -1,32 +1,23 @@
--- FPS HUB MOBILE - RAYFIELD INTEGRATED
+-- FPS HUB MOBILE PRO - VERSÃO COMPLETA E CORRIGIDA
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
--- Inicializa o Menu
-local Window = Rayfield:CreateWindow({
-    Name = "FPS HUB MOBILE PRO",
-    LoadingTitle = "Carregando...",
-    LoadingSubtitle = "Versão Void Kill"
-})
-
+local Window = Rayfield:CreateWindow({Name = "FPS HUB MOBILE PRO", LoadingTitle = "Inicializando...", LoadingSubtitle = "V6 - Full Features"})
 local VisualTab = Window:CreateTab("Visual", 4483362458)
 local AimTab = Window:CreateTab("Aim", 4483362458)
 local CombatTab = Window:CreateTab("Combat", 4483362458)
 
--- Variáveis de controle
 local aimOn = false
 local hitboxOn = false
-local voidFlingOn = false
+local flingOn = false
 
 ------------------------------------------------
--- 1. HITBOX RGB
+-- VISUAL: HITBOX RGB (Monitoramento Constante)
 ------------------------------------------------
 local function applyHighlight(char)
     if char and not char:FindFirstChild("Highlight") then
@@ -35,6 +26,7 @@ local function applyHighlight(char)
         hl.FillTransparency = 0.4
         hl.OutlineTransparency = 0
         hl.Parent = char
+        
         task.spawn(function()
             while hl.Parent do
                 local hue = tick() % 5 / 5
@@ -47,28 +39,24 @@ local function applyHighlight(char)
 end
 
 VisualTab:CreateToggle({
-    Name = "🌈 RGB em Todos",
+    Name = "🌈 RGB em Todos os Players",
     CurrentValue = false,
-    Callback = function(v) 
-        hitboxOn = v 
-        if not v then
-            for _, p in pairs(Players:GetPlayers()) do
-                if p.Character and p.Character:FindFirstChild("Highlight") then p.Character.Highlight:Destroy() end
-            end
+    Callback = function(v)
+        hitboxOn = v
+        if v then
+            for _, p in pairs(Players:GetPlayers()) do if p.Character then applyHighlight(p.Character) end end
+        else
+            for _, p in pairs(Players:GetPlayers()) do if p.Character then local h = p.Character:FindFirstChild("Highlight") if h then h:Destroy() end end end
         end
     end
 })
 
-RunService.RenderStepped:Connect(function()
-    if hitboxOn then
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= player and p.Character then applyHighlight(p.Character) end
-        end
-    end
+Players.PlayerAdded:Connect(function(p)
+    p.CharacterAdded:Connect(function(char) if hitboxOn then task.wait(0.5); applyHighlight(char) end end)
 end)
 
 ------------------------------------------------
--- 2. AIMBOT AUTOMÁTICO
+-- AIMBOT: Automático ao Mirar
 ------------------------------------------------
 AimTab:CreateToggle({Name = "🎯 Aimbot Automático", CurrentValue = false, Callback = function(v) aimOn = v end})
 
@@ -92,19 +80,42 @@ RunService.RenderStepped:Connect(function()
 end)
 
 ------------------------------------------------
--- 3. VOID KILL FLING
+-- COMBAT: ARREMESSO EXTREMO
 ------------------------------------------------
-CombatTab:CreateToggle({Name = "🥊 Arremesso p/ o Void", CurrentValue = false, Callback = function(v) voidFlingOn = v end})
+CombatTab:CreateToggle({Name = "🥊 Arremessar Extremo", CurrentValue = false, Callback = function(v) flingOn = v end})
 
 UserInputService.InputBegan:Connect(function(input, gpe)
-    if not voidFlingOn or gpe then return end
+    if not flingOn or gpe then return end
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                 local root = p.Character.HumanoidRootPart
                 local dist = (root.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                
-                if dist < 25 then
+                if dist < 20 then
+                    -- Detecta o fim do mapa (altura do void) e calcula a direção
+                    local voidHeight = workspace.FallenPartsDestroyHeight
+                    local targetPos = Vector3.new(root.Position.X, voidHeight - 50, root.Position.Z)
+                    local direction = (targetPos - root.Position).Unit
+
+                    local att = Instance.new("Attachment", root)
+                    local vel = Instance.new("LinearVelocity", root)
+                    vel.MaxForce = Vector3.new(1,1,1) * 999999999
+                    
+                    -- Aplica a força de 500 direto para baixo do fim do mapa
+                    vel.VectorVelocity = direction * 500
+                    vel.Attachment0 = att
+                    
+                    game:GetService("Debris"):AddItem(vel, 0.4)
+                    game:GetService("Debris"):AddItem(att, 0.4)
+                    p.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+                end
+            end
+        end
+    end
+end)
+
+print("FPS HUB MOBILE PRO V6 Carregado!")
+if dist < 25 then
                     local voidHeight = Workspace.FallenPartsDestroyHeight
                     local targetPos = Vector3.new(root.Position.X, voidHeight - 50, root.Position.Z)
                     local direction = (targetPos - root.Position).Unit

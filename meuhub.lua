@@ -1,4 +1,4 @@
--- BRAYAN HUB - MOBILE PRO (Versão v11.0 - Wallbang Pro Filter)
+-- BRAYAN HUB - MOBILE PRO (Versão v13.0 - Real Bullet Wallbang)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -6,13 +6,16 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
-local Window = Rayfield:CreateWindow({Name = "Brayan Hub", LoadingTitle = "Inicializando...", LoadingSubtitle = "Sincronizado v11.0"})
+local Window = Rayfield:CreateWindow({Name = "Brayan Hub", LoadingTitle = "Inicializando...", LoadingSubtitle = "Sincronizado v13.0"})
 local VisualTab = Window:CreateTab("Visual", 4483362458)
 local AimTab = Window:CreateTab("Aim", 4483362458)
 
 local aimOn = false
 local visualsOn = false
 local magicBulletOn = false
+
+-- Variável global para guardar o alvo atual
+local globalClosestHead = nil
 
 -- Tabelas para armazenar os desenhos do ESP
 local boxes = {}
@@ -69,10 +72,44 @@ AimTab:CreateToggle({
 })
 
 AimTab:CreateToggle({
-    Name = "🧱 Bala Mágica (Apenas Paredes)",
+    Name = "🧱 Bala Mágica (Atravessar Obstáculos)",
     CurrentValue = false,
     Callback = function(v) magicBulletOn = v end
 })
+
+------------------------------------------------
+-- HOOK DE BALA MÁGICA (SPOOF DE MOUSE/TIRO)
+------------------------------------------------
+-- Modifica o comportamento nativo do jogo para fazer o tiro atravessar e registrar na cabeça
+local gmt = getrawmetatable(game)
+local oldNamecall = gmt.__namecall
+local oldIndex = gmt.__index
+setreadonly(gmt, false)
+
+gmt.__index = newcclosure(function(self, key)
+    if magicBulletOn and globalClosestHead and tostring(self) == "Mouse" then
+        if key == "Hit" then
+            return globalClosestHead.CFrame
+        elseif key == "Target" then
+            return globalClosestHead
+        end
+    end
+    return oldIndex(self, key)
+end)
+
+gmt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    
+    if magicBulletOn and globalClosestHead and (method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList" or method == "Raycast") then
+        -- Força o motor de raios do jogo a fingir que não viu a parede e focar no player
+        return globalClosestHead, globalClosestHead.Position, Vector3.new(0,1,0), globalClosestHead.Material
+    end
+    
+    return oldNamecall(self, ...)
+end)
+
+setreadonly(gmt, true)
 
 ------------------------------------------------
 -- LOOP PRINCIPAL UNIFICADO (RenderStepped)
@@ -82,43 +119,8 @@ RunService.RenderStepped:Connect(function()
     local dynamicColor = Color3.fromHSV(hue, 1, 1)
     
     local center = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
-    local closestHead = nil
     local shortestDist = math.huge
-
-    ------------------------------------------------
-    -- NOVA LÓGICA DE FILTRAGEM DA BALA MÁGICA
-    ------------------------------------------------
-    if magicBulletOn then
-        for _, obj in pairs(workspace:GetDescendants()) do
-            if obj:IsA("BasePart") then
-                local name = obj.Name:lower()
-                
-                -- FILTRO SELETIVO: Se for chão, rampa, caixa, escada ou terreno, IGNORA (Mantém Sólido)
-                if name:find("floor") or name:find("ground") or name:find("baseplate") or 
-                   name:find("ramp") or name:find("rampa") or name:find("box") or 
-                   name:find("caixa") or name:find("stair") or name:find("escada") or 
-                   name:find("step") or obj.ClassName == "Terrain" then
-                    
-                    obj.CanCollide = true
-                else
-                    -- Se o nome indicar parede ou se for uma estrutura vertical genérica, desativa a colisão para a bala passar
-                    if name:find("wall") or name:find("parede") or name:find("brick") or name:find("glass") or obj.Size.Y > obj.Size.X then
-                        obj.CanCollide = false
-                    end
-                end
-            end
-        end
-    else
-        -- Se desligar, força tudo a voltar ao normal
-        for _, obj in pairs(workspace:GetDescendants()) do
-            if obj:IsA("BasePart") and obj.ClassName ~= "Terrain" then
-                -- Ativa novamente as colisões padrão do mapa
-                if string.find(obj.Name:lower(), "wall") or string.find(obj.Name:lower(), "parede") then
-                    obj.CanCollide = true
-                end
-            end
-        end
-    end
+    globalClosestHead = nil -- Reseta para o Hook reavaliar
 
     ------------------------------------------------
     -- LOOP DE JOGADORES (AIMBOT, RGB E ESP)
@@ -168,13 +170,22 @@ RunService.RenderStepped:Connect(function()
                 if lines[p] then lines[p].Visible = false end
             end
 
-            -- 2. AIMBOT (Foco na Cabeça)
-            if aimOn and hum and hum.Health > 0 and head then
+            -- 2. AJUSTE DO ALVO DO AIMBOT E DA BALA MÁGICA
+            if hum and hum.Health > 0 and head then
                 local pos, onScreen = camera:WorldToViewportPoint(head.Position)
-                if onScreen then
+                
+                if magicBulletOn then
+                    -- Se a Bala Mágica estiver ativa, busca alvos mesmo atrás de paredes (360 graus)
+                    local dist3D = (head.Position - camera.CFrame.Position).Magnitude
+                    if dist3D < shortestDist then
+                        globalClosestHead = head
+                        shortestDist = dist3D
+                    end
+                elseif aimOn and onScreen then
+                    -- Com bala mágica desativada, usa a distância tradicional da tela
                     local magnitude = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                     if magnitude < 300 and magnitude < shortestDist then
-                        closestHead = head
+                        globalClosestHead = head
                         shortestDist = magnitude
                     end
                 end
@@ -183,10 +194,10 @@ RunService.RenderStepped:Connect(function()
     end
 
     -- 3. EXECUÇÃO DO AIMBOT
-    if aimOn and closestHead then
-        local targetCFrame = CFrame.lookAt(camera.CFrame.Position, closestHead.Position)
+    if aimOn and globalClosestHead then
+        local targetCFrame = CFrame.lookAt(camera.CFrame.Position, globalClosestHead.Position)
         camera.CFrame = camera.CFrame:Lerp(targetCFrame, 0.16)
     end
 end)
 
-print("Brayan Hub v11.0 carregado - Proteção Completa de Chão/Rampas!")
+print("Brayan Hub v13.0 Carregado - Bala Mágica por Injeção de Raycast ativa!")

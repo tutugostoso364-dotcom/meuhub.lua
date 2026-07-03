@@ -1,4 +1,4 @@
--- BRAYAN HUB - MOBILE PRO (Versão v13.0 - Real Bullet Wallbang)
+-- BRAYAN HUB - MOBILE PRO (Versão v13.5 - Dual Aimbot Edition)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -6,16 +6,18 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
-local Window = Rayfield:CreateWindow({Name = "Brayan Hub", LoadingTitle = "Inicializando...", LoadingSubtitle = "Sincronizado v13.0"})
+local Window = Rayfield:CreateWindow({Name = "Brayan Hub", LoadingTitle = "Inicializando...", LoadingSubtitle = "Sincronizado v13.5"})
 local VisualTab = Window:CreateTab("Visual", 4483362458)
 local AimTab = Window:CreateTab("Aim", 4483362458)
 
 local aimOn = false
+local aim2On = false -- Variável nova para o segundo Aimbot
 local visualsOn = false
 local magicBulletOn = false
 
--- Variável global para guardar o alvo atual
+-- Variáveis globais para guardar os alvos de forma independente
 local globalClosestHead = nil
+local globalClosestHead2 = nil -- Alvo do segundo Aimbot
 
 -- Tabelas para armazenar os desenhos do ESP
 local boxes = {}
@@ -66,9 +68,16 @@ VisualTab:CreateToggle({
 })
 
 AimTab:CreateToggle({
-    Name = "🎯 Aimbot Automático (Grudar na Cabeça)",
+    Name = "🎯 Aimbot 1 (Grudar na Cabeça - Original)",
     CurrentValue = false,
     Callback = function(v) aimOn = v end
+})
+
+-- NOVA OPÇÃO ADICIONADA AQUI
+AimTab:CreateToggle({
+    Name = "👁️ Aimbot 2 (Foco Total na Tela)",
+    CurrentValue = false,
+    Callback = function(v) aim2On = v end
 })
 
 AimTab:CreateToggle({
@@ -80,7 +89,6 @@ AimTab:CreateToggle({
 ------------------------------------------------
 -- HOOK DE BALA MÁGICA (SPOOF DE MOUSE/TIRO)
 ------------------------------------------------
--- Modifica o comportamento nativo do jogo para fazer o tiro atravessar e registrar na cabeça
 local gmt = getrawmetatable(game)
 local oldNamecall = gmt.__namecall
 local oldIndex = gmt.__index
@@ -99,10 +107,8 @@ end)
 
 gmt.__namecall = newcclosure(function(self, ...)
     local method = getnamecallmethod()
-    local args = {...}
     
     if magicBulletOn and globalClosestHead and (method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList" or method == "Raycast") then
-        -- Força o motor de raios do jogo a fingir que não viu a parede e focar no player
         return globalClosestHead, globalClosestHead.Position, Vector3.new(0,1,0), globalClosestHead.Material
     end
     
@@ -119,8 +125,12 @@ RunService.RenderStepped:Connect(function()
     local dynamicColor = Color3.fromHSV(hue, 1, 1)
     
     local center = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
+    
     local shortestDist = math.huge
-    globalClosestHead = nil -- Reseta para o Hook reavaliar
+    local shortestDist2 = math.huge -- Distância para o Aimbot 2
+    
+    globalClosestHead = nil 
+    globalClosestHead2 = nil -- Reseta o alvo 2 a cada frame
 
     ------------------------------------------------
     -- LOOP DE JOGADORES (AIMBOT, RGB E ESP)
@@ -170,35 +180,50 @@ RunService.RenderStepped:Connect(function()
                 if lines[p] then lines[p].Visible = false end
             end
 
-            -- 2. AJUSTE DO ALVO DO AIMBOT E DA BALA MÁGICA
+            -- 2. AJUSTE DO ALVO DOS AIMBOTS
             if hum and hum.Health > 0 and head then
                 local pos, onScreen = camera:WorldToViewportPoint(head.Position)
                 
+                -- Processamento do Aimbot 1 & Bala Mágica (Inalterados)
                 if magicBulletOn then
-                    -- Se a Bala Mágica estiver ativa, busca alvos mesmo atrás de paredes (360 graus)
                     local dist3D = (head.Position - camera.CFrame.Position).Magnitude
                     if dist3D < shortestDist then
                         globalClosestHead = head
                         shortestDist = dist3D
                     end
                 elseif aimOn and onScreen then
-                    -- Com bala mágica desativada, usa a distância tradicional da tela
                     local magnitude = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                     if magnitude < 300 and magnitude < shortestDist then
                         globalClosestHead = head
                         shortestDist = magnitude
                     end
                 end
+
+                -- NOVA LOGICA SEPARADA: Busca de alvo para o Aimbot 2
+                if aim2On and onScreen then
+                    local magnitude2 = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if magnitude2 < shortestDist2 then
+                        globalClosestHead2 = head
+                        shortestDist2 = magnitude2
+                    end
+                end
             end
         end
     end
 
-    -- 3. EXECUÇÃO DO AIMBOT
+    ------------------------------------------------
+    -- 3. EXECUÇÃO DOS AIMBOTS
+    ------------------------------------------------
+    -- Executa o Aimbot 1 se ele encontrar alvo
     if aimOn and globalClosestHead then
         local targetCFrame = CFrame.lookAt(camera.CFrame.Position, globalClosestHead.Position)
         camera.CFrame = camera.CFrame:Lerp(targetCFrame, 0.16)
+        
+    -- Executa o Aimbot 2 se o 1 estiver desligado ou sem alvo
+    elseif aim2On and globalClosestHead2 then
+        local targetCFrame2 = CFrame.lookAt(camera.CFrame.Position, globalClosestHead2.Position)
+        camera.CFrame = camera.CFrame:Lerp(targetCFrame2, 0.16)
     end
 end)
 
-print("Brayan Hub v13.0 Carregado - Bala Mágica por Injeção de Raycast ativa!")
-
+print("Brayan Hub v13.5 Carregado - Dual Aimbot Ativo com Sucesso!")

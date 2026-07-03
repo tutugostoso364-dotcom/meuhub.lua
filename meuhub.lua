@@ -1,4 +1,4 @@
--- BRAYAN HUB - MOBILE PRO (Versão v14.7 - Fix Aim Lock Position)
+-- BRAYAN HUB - MOBILE PRO (Versão v13.0 - Real Bullet Wallbang)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -6,41 +6,53 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
-local Window = Rayfield:CreateWindow({Name = "Brayan Hub", LoadingTitle = "Inicializando...", LoadingSubtitle = "Sincronizado v14.7"})
+local Window = Rayfield:CreateWindow({Name = "Brayan Hub", LoadingTitle = "Inicializando...", LoadingSubtitle = "Sincronizado v13.0"})
 local VisualTab = Window:CreateTab("Visual", 4483362458)
 local AimTab = Window:CreateTab("Aim", 4483362458)
 
 local aimOn = false
-local aim2On = false
 local visualsOn = false
 local magicBulletOn = false
 
+-- Variável global para guardar o alvo atual
 local globalClosestHead = nil
-local globalClosestHead2 = nil
 
+-- Tabelas para armazenar os desenhos do ESP
 local boxes = {}
 local lines = {}
 
 ------------------------------------------------
--- FUNÇÕES DE ESP E LIMPEZA
+-- FUNÇÕES AUXILIARES DE LIMPEZA E CRIAÇÃO DO ESP
 ------------------------------------------------
 local function clearVisuals(p)
     if boxes[p] then boxes[p]:Destroy(); boxes[p] = nil end
     if lines[p] then lines[p]:Destroy(); lines[p] = nil end
+    if p.Character then
+        local h = p.Character:FindFirstChild("Brayan_Hub_Highlight")
+        if h then h:Destroy() end
+    end
 end
 
-local function cleanupHighlights()
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("Highlight") and obj.Name == "Brayan_Hub_Highlight" then
-            obj:Destroy()
-        end
+local function createESP(p)
+    if not boxes[p] then
+        local box = Drawing.new("Square")
+        box.Thickness = 2
+        box.Filled = false
+        box.Visible = false
+        boxes[p] = box
+    end
+    if not lines[p] then
+        local line = Drawing.new("Line")
+        line.Thickness = 1.5
+        line.Visible = false
+        lines[p] = line
     end
 end
 
 Players.PlayerRemoving:Connect(clearVisuals)
 
 ------------------------------------------------
--- INTERFACE GRÁFICA
+-- INTERFACE GRÁFICA (VISUAL & AIM)
 ------------------------------------------------
 VisualTab:CreateToggle({
     Name = "🌈 Hitbox RGB + ESP (Box/Lines)",
@@ -49,21 +61,14 @@ VisualTab:CreateToggle({
         visualsOn = v
         if not v then
             for _, p in pairs(Players:GetPlayers()) do clearVisuals(p) end
-            cleanupHighlights()
         end
     end
 })
 
 AimTab:CreateToggle({
-    Name = "🎯 Aimbot 1 (Grudar na Cabeça)",
+    Name = "🎯 Aimbot Automático (Grudar na Cabeça)",
     CurrentValue = false,
     Callback = function(v) aimOn = v end
-})
-
-AimTab:CreateToggle({
-    Name = "⚡ Aimbot 2 (Grudar Rápido - 0.65)",
-    CurrentValue = false,
-    Callback = function(v) aim2On = v end
 })
 
 AimTab:CreateToggle({
@@ -73,97 +78,128 @@ AimTab:CreateToggle({
 })
 
 ------------------------------------------------
--- LOOP PRINCIPAL
+-- HOOK DE BALA MÁGICA (SPOOF DE MOUSE/TIRO)
+------------------------------------------------
+-- Modifica o comportamento nativo do jogo para fazer o tiro atravessar e registrar na cabeça
+local gmt = getrawmetatable(game)
+local oldNamecall = gmt.__namecall
+local oldIndex = gmt.__index
+setreadonly(gmt, false)
+
+gmt.__index = newcclosure(function(self, key)
+    if magicBulletOn and globalClosestHead and tostring(self) == "Mouse" then
+        if key == "Hit" then
+            return globalClosestHead.CFrame
+        elseif key == "Target" then
+            return globalClosestHead
+        end
+    end
+    return oldIndex(self, key)
+end)
+
+gmt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+    
+    if magicBulletOn and globalClosestHead and (method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList" or method == "Raycast") then
+        -- Força o motor de raios do jogo a fingir que não viu a parede e focar no player
+        return globalClosestHead, globalClosestHead.Position, Vector3.new(0,1,0), globalClosestHead.Material
+    end
+    
+    return oldNamecall(self, ...)
+end)
+
+setreadonly(gmt, true)
+
+------------------------------------------------
+-- LOOP PRINCIPAL UNIFICADO (RenderStepped)
 ------------------------------------------------
 RunService.RenderStepped:Connect(function()
     local hue = tick() % 5 / 5
     local dynamicColor = Color3.fromHSV(hue, 1, 1)
-    local center = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
     
+    local center = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
     local shortestDist = math.huge
-    local shortestDist2 = math.huge
-    globalClosestHead = nil 
-    globalClosestHead2 = nil
+    globalClosestHead = nil -- Reseta para o Hook reavaliar
 
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") and obj ~= player.Character then
-            local head = obj:FindFirstChild("Head")
-            local hum = obj:FindFirstChildOfClass("Humanoid")
-            local root = obj:FindFirstChild("HumanoidRootPart")
-            
-            if head and hum and root and hum.Health > 0 then
-                local targetPlayer = Players:GetPlayerFromCharacter(obj) or obj.Name
-                
-                -- 1. SISTEMA VISUAL (ESP + HIGHLIGHT)
-                if visualsOn then
-                    local hl = obj:FindFirstChild("Brayan_Hub_Highlight")
-                    if not hl then
-                        hl = Instance.new("Highlight")
-                        hl.Name = "Brayan_Hub_Highlight"
-                        hl.Parent = obj
-                    end
-                    hl.FillColor = dynamicColor
-                    hl.OutlineColor = dynamicColor
+    ------------------------------------------------
+    -- LOOP DE JOGADORES (AIMBOT, RGB E ESP)
+    ------------------------------------------------
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player and p.Character then
+            local head = p.Character:FindFirstChild("Head")
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            local root = p.Character:FindFirstChild("HumanoidRootPart")
 
-                    if not boxes[targetPlayer] then
-                        boxes[targetPlayer] = Drawing.new("Square")
-                        boxes[targetPlayer].Filled = false
-                        boxes[targetPlayer].Thickness = 2
-                        lines[targetPlayer] = Drawing.new("Line")
-                        lines[targetPlayer].Thickness = 1.5
-                    end
-
-                    local pos, onScreen = camera:WorldToViewportPoint(head.Position)
-                    if onScreen then
-                        local rootPos = camera:WorldToViewportPoint(root.Position)
-                        local boxSize = Vector2.new(1000 / rootPos.Z, 1500 / rootPos.Z)
-                        boxes[targetPlayer].Position = Vector2.new(rootPos.X - boxSize.X / 2, rootPos.Y - boxSize.Y / 2)
-                        boxes[targetPlayer].Size = boxSize
-                        boxes[targetPlayer].Color = dynamicColor
-                        boxes[targetPlayer].Visible = true
-                        
-                        lines[targetPlayer].From = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y)
-                        lines[targetPlayer].To = Vector2.new(rootPos.X, rootPos.Y)
-                        lines[targetPlayer].Color = dynamicColor
-                        lines[targetPlayer].Visible = true
-                    else
-                        boxes[targetPlayer].Visible = false
-                        lines[targetPlayer].Visible = false
-                    end
-                else
-                    if boxes[targetPlayer] then boxes[targetPlayer].Visible = false end
-                    if lines[targetPlayer] then lines[targetPlayer].Visible = false end
+            -- 1. SISTEMA VISUAL: HITBOX RGB INFINITA + ESP
+            if visualsOn and hum and head and root then
+                local hl = p.Character:FindFirstChild("Brayan_Hub_Highlight")
+                if not hl then
+                    hl = Instance.new("Highlight")
+                    hl.Name = "Brayan_Hub_Highlight"
+                    hl.Adornee = p.Character
+                    hl.FillTransparency = 0.4
+                    hl.OutlineTransparency = 0
+                    hl.Parent = p.Character
                 end
+                hl.FillColor = dynamicColor
+                hl.OutlineColor = dynamicColor
 
-                -- 2. LÓGICA DO AIMBOT
-                local pos, onScreen = camera:WorldToViewportPoint(head.Position)
+                createESP(p)
+                local headPos, onScreen = camera:WorldToViewportPoint(head.Position)
+                
                 if onScreen then
-                    local mag = (Vector2.new(pos.X, pos.Y) - center).Magnitude
-                    if aimOn and mag < 300 and mag < shortestDist then
+                    local rootPos = camera:WorldToViewportPoint(root.Position)
+                    local boxSize = Vector2.new(camera.ViewportSize.X / rootPos.Z * 2, camera.ViewportSize.Y / rootPos.Z * 3)
+                    
+                    boxes[p].Size = boxSize
+                    boxes[p].Position = Vector2.new(rootPos.X - boxSize.X / 2, rootPos.Y - boxSize.Y / 2)
+                    boxes[p].Color = dynamicColor
+                    boxes[p].Visible = true
+
+                    lines[p].From = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y)
+                    lines[p].To = Vector2.new(rootPos.X, rootPos.Y)
+                    lines[p].Color = dynamicColor
+                    lines[p].Visible = true
+                else
+                    if boxes[p] then boxes[p].Visible = false end
+                    if lines[p] then lines[p].Visible = false end
+                end
+            else
+                if boxes[p] then boxes[p].Visible = false end
+                if lines[p] then lines[p].Visible = false end
+            end
+
+            -- 2. AJUSTE DO ALVO DO AIMBOT E DA BALA MÁGICA
+            if hum and hum.Health > 0 and head then
+                local pos, onScreen = camera:WorldToViewportPoint(head.Position)
+                
+                if magicBulletOn then
+                    -- Se a Bala Mágica estiver ativa, busca alvos mesmo atrás de paredes (360 graus)
+                    local dist3D = (head.Position - camera.CFrame.Position).Magnitude
+                    if dist3D < shortestDist then
                         globalClosestHead = head
-                        shortestDist = mag
+                        shortestDist = dist3D
                     end
-                    if aim2On and mag < shortestDist2 then
-                        globalClosestHead2 = head
-                        shortestDist2 = mag
+                elseif aimOn and onScreen then
+                    -- Com bala mágica desativada, usa a distância tradicional da tela
+                    local magnitude = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+                    if magnitude < 300 and magnitude < shortestDist then
+                        globalClosestHead = head
+                        shortestDist = magnitude
                     end
                 end
             end
         end
     end
 
-    ------------------------------------------------
-    -- 3. EXECUÇÃO DA MIRA (CORREÇÃO DE POSIÇÃO)
-    ------------------------------------------------
+    -- 3. EXECUÇÃO DO AIMBOT
     if aimOn and globalClosestHead then
-        -- Trava usando lookAt direto da posição da câmera para a posição exata global do osso
         local targetCFrame = CFrame.lookAt(camera.CFrame.Position, globalClosestHead.Position)
         camera.CFrame = camera.CFrame:Lerp(targetCFrame, 0.16)
-    elseif aim2On and globalClosestHead2 then
-        -- Trava precisa com velocidade 0.65 corrigida para não dar offset
-        local targetCFrame2 = CFrame.lookAt(camera.CFrame.Position, globalClosestHead2.Position)
-        camera.CFrame = camera.CFrame:Lerp(targetCFrame2, 0.65)
     end
 end)
 
-print("Brayan Hub v14.7 Carregado - Trava de CFrame centralizada com sucesso!")
+print("Brayan Hub v13.0 Carregado - Bala Mágica por Injeção de Raycast ativa!")
+
+Acrescente mais um aimbot básico que gruda mira no jogador na cabeça mais deixe o primeiro tbm o 2 e uma nova funçao

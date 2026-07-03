@@ -1,4 +1,4 @@
--- BRAYAN HUB - MOBILE PRO (Versão v14.0 - Fast Smooth Aimbot)
+-- BRAYAN HUB - MOBILE PRO (Versão v14.5 - Fix ESP Sync & Smooth Aim)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -6,7 +6,7 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
-local Window = Rayfield:CreateWindow({Name = "Brayan Hub", LoadingTitle = "Inicializando...", LoadingSubtitle = "Sincronizado v14.0"})
+local Window = Rayfield:CreateWindow({Name = "Brayan Hub", LoadingTitle = "Inicializando...", LoadingSubtitle = "Sincronizado v14.5"})
 local VisualTab = Window:CreateTab("Visual", 4483362458)
 local AimTab = Window:CreateTab("Aim", 4483362458)
 
@@ -74,7 +74,7 @@ AimTab:CreateToggle({
 })
 
 AimTab:CreateToggle({
-    Name = "⚡ Aimbot 2 (Grudar Instantâneo - Rápido)",
+    Name = "⚡ Aimbot 2 (Grudar Suave - Ajustado)",
     CurrentValue = false,
     Callback = function(v) aim2On = v end
 })
@@ -144,7 +144,8 @@ RunService.RenderStepped:Connect(function()
     -- LOOP DETECTOR DE PARTIDA
     ------------------------------------------------
     for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("Model") and obj ~= player.Character then
+        -- SÓ PROCESSA SE NÃO FOR O SEU PRÓPRIO PERSONAGEM
+        if obj:IsA("Model") and obj ~= player.Character and (player.Character == nil or obj ~= player.Character) then
             local head = obj:FindFirstChild("Head")
             local hum = obj:FindFirstChildOfClass("Humanoid")
             local root = obj:FindFirstChild("HumanoidRootPart")
@@ -152,7 +153,7 @@ RunService.RenderStepped:Connect(function()
             if head and hum and root and hum.Health > 0 then
                 local targetPlayer = getPlayerFromCharacter(obj)
                 
-                -- 1. SISTEMA VISUAL
+                -- 1. SISTEMA VISUAL (APENAS NOS OUTROS JOGADORES)
                 if visualsOn then
                     local hl = obj:FindFirstChild("Brayan_Hub_Highlight")
                     if not hl then
@@ -168,13 +169,19 @@ RunService.RenderStepped:Connect(function()
 
                     if targetPlayer then
                         createESP(targetPlayer)
-                        local _, onScreen = camera:WorldToViewportPoint(head.Position)
+                        local headPos, onScreen = camera:WorldToViewportPoint(head.Position)
+                        
                         if onScreen then
+                            -- Nova matemática de ESP Mobile estável colada no esqueleto
                             local rootPos = camera:WorldToViewportPoint(root.Position)
-                            local boxSize = Vector2.new(camera.ViewportSize.X / rootPos.Z * 2, camera.ViewportSize.Y / rootPos.Z * 3)
+                            local topPos = camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1.6, 0))
+                            local bottomPos = camera:WorldToViewportPoint(root.Position - Vector3.new(0, 3, 0))
+                            
+                            local boxHeight = math.abs(topPos.Y - bottomPos.Y)
+                            local boxSize = Vector2.new(boxHeight * 0.6, boxHeight)
                             
                             boxes[targetPlayer].Size = boxSize
-                            boxes[targetPlayer].Position = Vector2.new(rootPos.X - boxSize.X / 2, rootPos.Y - boxSize.Y / 2)
+                            boxes[targetPlayer].Position = Vector2.new(rootPos.X - boxSize.X / 2, topPos.Y)
                             boxes[targetPlayer].Color = dynamicColor
                             boxes[targetPlayer].Visible = true
 
@@ -221,21 +228,24 @@ RunService.RenderStepped:Connect(function()
                     end
                 end
             end
+        elseif obj:IsA("Model") and obj == player.Character then
+            -- Garante que se o Highlight surgir em você por bug do Roblox, ele seja deletado na hora
+            local hl = obj:FindFirstChild("Brayan_Hub_Highlight")
+            if hl then hl:Destroy() end
         end
     end
 
     ------------------------------------------------
-    -- 3. EXECUÇÃO DOS AIMBOTS (VELOCIDADE AJUSTADA)
+    -- 3. EXECUÇÃO DOS AIMBOTS (SUAVIDADE CORRIGIDA)
     ------------------------------------------------
     if aimOn and globalClosestHead then
-        -- Aimbot 1 Original (Suavidade normal)
         local targetCFrame = CFrame.lookAt(camera.CFrame.Position, globalClosestHead.Position)
         camera.CFrame = camera.CFrame:Lerp(targetCFrame, 0.16)
     elseif aim2On and globalClosestHead2 then
-        -- Aimbot 2 Novo (Ajustado para grudar instantâneo e ultra rápido)
+        -- Velocidade ajustada de 0.85 para 0.40 (Gruda suave e firme)
         local targetCFrame2 = CFrame.lookAt(camera.CFrame.Position, globalClosestHead2.Position)
-        camera.CFrame = camera.CFrame:Lerp(targetCFrame2, 0.85)
+        camera.CFrame = camera.CFrame:Lerp(targetCFrame2, 0.40)
     end
 end)
 
-print("Brayan Hub v14.0 Carregado - Aimbot 2 Acelerado para 0.85!")
+print("Brayan Hub v14.5 Carregado - Visuais Corrigidos e Aim 2 Suavizado para 0.40!")

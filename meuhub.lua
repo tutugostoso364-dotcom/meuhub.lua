@@ -1,4 +1,4 @@
--- BRAYAN HUB - MOBILE PRO (Versão v13.0 - Real Bullet Wallbang)
+-- BRAYAN HUB - MOBILE PRO (Versão v13.5 - Dual Aimbot Edition)
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -6,13 +6,15 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
-local Window = Rayfield:CreateWindow({Name = "Brayan Hub", LoadingTitle = "Inicializando...", LoadingSubtitle = "Sincronizado v13.0"})
+local Window = Rayfield:CreateWindow({Name = "Brayan Hub", LoadingTitle = "Inicializando...", LoadingSubtitle = "Sincronizado v13.5"})
 local VisualTab = Window:CreateTab("Visual", 4483362458)
 local AimTab = Window:CreateTab("Aim", 4483362458)
 
 local aimOn = false
-local visualsOn = false
+local advancedAimOn = false -- Nova variável para o Aimbot Novo
+local advancedAimFOV = 150   -- Tamanho do círculo do novo Aimbot
 local magicBulletOn = false
+local visualsOn = false
 
 -- Variável global para guardar o alvo atual
 local globalClosestHead = nil
@@ -20,6 +22,14 @@ local globalClosestHead = nil
 -- Tabelas para armazenar os desenhos do ESP
 local boxes = {}
 local lines = {}
+
+-- Criação do Círculo de FOV para o Novo Aimbot
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 1.5
+FOVCircle.Filled = false
+FOVCircle.Color = Color3.fromRGB(255, 0, 0)
+FOVCircle.Visible = false
+FOVCircle.Radius = advancedAimFOV
 
 ------------------------------------------------
 -- FUNÇÕES AUXILIARES DE LIMPEZA E CRIAÇÃO DO ESP
@@ -66,9 +76,33 @@ VisualTab:CreateToggle({
 })
 
 AimTab:CreateToggle({
-    Name = "🎯 Aimbot Automático (Grudar na Cabeça)",
+    Name = "🎯 Aimbot Automático (Grudar na Cabeça - Original)",
     CurrentValue = false,
     Callback = function(v) aimOn = v end
+})
+
+-- O NOVO AIMBOT QUE VOCÊ PEDIU (SEPARADO)
+AimTab:CreateToggle({
+    Name = "⚡ Aimbot Dinâmico (Predição + Círculo FOV)",
+    CurrentValue = false,
+    Callback = function(v) 
+        advancedAimOn = v 
+        FOVCircle.Visible = v
+    end
+})
+
+AimTab:CreateSlider({
+    Name = "⭕ Tamanho do Círculo do Aimbot Dinâmico",
+    Min = 50,
+    Max = 400,
+    Default = 150,
+    Color = Color3.fromRGB(255, 50, 50),
+    Increment = 10,
+    ValueName = "Pixels",
+    Callback = function(v) 
+        advancedAimFOV = v
+        FOVCircle.Radius = v
+    end
 })
 
 AimTab:CreateToggle({
@@ -80,7 +114,6 @@ AimTab:CreateToggle({
 ------------------------------------------------
 -- HOOK DE BALA MÁGICA (SPOOF DE MOUSE/TIRO)
 ------------------------------------------------
--- Modifica o comportamento nativo do jogo para fazer o tiro atravessar e registrar na cabeça
 local gmt = getrawmetatable(game)
 local oldNamecall = gmt.__namecall
 local oldIndex = gmt.__index
@@ -88,27 +121,19 @@ setreadonly(gmt, false)
 
 gmt.__index = newcclosure(function(self, key)
     if magicBulletOn and globalClosestHead and tostring(self) == "Mouse" then
-        if key == "Hit" then
-            return globalClosestHead.CFrame
-        elseif key == "Target" then
-            return globalClosestHead
-        end
+        if key == "Hit" then return globalClosestHead.CFrame
+        elseif key == "Target" then return globalClosestHead end
     end
     return oldIndex(self, key)
 end)
 
 gmt.__namecall = newcclosure(function(self, ...)
     local method = getnamecallmethod()
-    local args = {...}
-    
     if magicBulletOn and globalClosestHead and (method == "FindPartOnRay" or method == "FindPartOnRayWithIgnoreList" or method == "Raycast") then
-        -- Força o motor de raios do jogo a fingir que não viu a parede e focar no player
         return globalClosestHead, globalClosestHead.Position, Vector3.new(0,1,0), globalClosestHead.Material
     end
-    
     return oldNamecall(self, ...)
 end)
-
 setreadonly(gmt, true)
 
 ------------------------------------------------
@@ -119,11 +144,17 @@ RunService.RenderStepped:Connect(function()
     local dynamicColor = Color3.fromHSV(hue, 1, 1)
     
     local center = Vector2.new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
+    FOVCircle.Position = center
+    FOVCircle.Color = dynamicColor -- Faz o círculo de FOV também acompanhar o efeito RGB do Hub
+    
     local shortestDist = math.huge
-    globalClosestHead = nil -- Reseta para o Hook reavaliar
+    globalClosestHead = nil 
+
+    local advancedClosestHead = nil
+    local advancedShortestDist = advancedAimFOV -- Limita o alvo para ficar apenas dentro do raio do círculo
 
     ------------------------------------------------
-    -- LOOP DE JOGADORES (AIMBOT, RGB E ESP)
+    -- LOOP DE JOGADORES (AIMBOTS, RGB E ESP)
     ------------------------------------------------
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= player and p.Character then
@@ -170,34 +201,61 @@ RunService.RenderStepped:Connect(function()
                 if lines[p] then lines[p].Visible = false end
             end
 
-            -- 2. AJUSTE DO ALVO DO AIMBOT E DA BALA MÁGICA
+            -- 2. AJUSTE DO ALVO (Mecanismo Original & Mecanismo do Novo Aimbot)
             if hum and hum.Health > 0 and head then
                 local pos, onScreen = camera:WorldToViewportPoint(head.Position)
+                local screenPos = Vector2.new(pos.X, pos.Y)
+                local magnitude = (screenPos - center).Magnitude
                 
+                -- LOGICA DO AIMBOT ORIGINAL
                 if magicBulletOn then
-                    -- Se a Bala Mágica estiver ativa, busca alvos mesmo atrás de paredes (360 graus)
                     local dist3D = (head.Position - camera.CFrame.Position).Magnitude
                     if dist3D < shortestDist then
                         globalClosestHead = head
                         shortestDist = dist3D
                     end
                 elseif aimOn and onScreen then
-                    -- Com bala mágica desativada, usa a distância tradicional da tela
-                    local magnitude = (Vector2.new(pos.X, pos.Y) - center).Magnitude
                     if magnitude < 300 and magnitude < shortestDist then
                         globalClosestHead = head
                         shortestDist = magnitude
+                    end
+                end
+
+                -- LÓGICA DO NOVO AIMBOT DINÂMICO (Calculado Separadamente)
+                if advancedAimOn and onScreen then
+                    if magnitude < advancedShortestDist then
+                        advancedClosestHead = head
+                        advancedShortestDist = magnitude
                     end
                 end
             end
         end
     end
 
-    -- 3. EXECUÇÃO DO AIMBOT
+    ------------------------------------------------
+    -- 3. EXECUÇÃO DOS AIMBOTS
+    ------------------------------------------------
+    -- Execução do Aimbot Original
     if aimOn and globalClosestHead then
         local targetCFrame = CFrame.lookAt(camera.CFrame.Position, globalClosestHead.Position)
         camera.CFrame = camera.CFrame:Lerp(targetCFrame, 0.16)
+        
+    -- Execução do Novo Aimbot Dinâmico com Predição (Caso o original esteja desligado)
+    elseif advancedAimOn and advancedClosestHead then
+        local targetVelocity = Vector3.new(0, 0, 0)
+        local targetRoot = advancedClosestHead.Parent:FindFirstChild("HumanoidRootPart")
+        
+        -- Pega a velocidade vetorial do oponente para calcular o desvio
+        if targetRoot then
+            targetVelocity = targetRoot.Velocity
+        end
+        
+        -- Equação matemática básica de predição: Posição futura = Posição atual + (Velocidade * Tempo de resposta)
+        local predictedPosition = advancedClosestHead.Position + (targetVelocity * 0.115)
+        
+        local targetCFrame = CFrame.lookAt(camera.CFrame.Position, predictedPosition)
+        camera.CFrame = camera.CFrame:Lerp(targetCFrame, 0.20) -- Força de arraste levemente mais rápida
     end
 end)
 
-print("Brayan Hub v13.0 Carregado - Bala Mágica por Injeção de Raycast ativa!")
+print("Brayan Hub v13.5 Carregado - Novo Aimbot Dinâmico Adicionado com Sucesso!")

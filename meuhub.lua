@@ -1,4 +1,6 @@
--- FPS HUB MOBILE - VERSÃO COMPACTA E DIRETA (Sem erro de menu)
+-- FPS HUB MOBILE - RAYFIELD INTEGRATED
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -7,13 +9,24 @@ local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 
--- Variáveis de controle (Você pode mudar para 'true' para ativar manualmente sem o menu)
-local hitboxOn = true 
-local aimOn = true
-local voidFlingOn = true
+-- Inicializa o Menu
+local Window = Rayfield:CreateWindow({
+    Name = "FPS HUB MOBILE PRO",
+    LoadingTitle = "Carregando...",
+    LoadingSubtitle = "Versão Void Kill"
+})
+
+local VisualTab = Window:CreateTab("Visual", 4483362458)
+local AimTab = Window:CreateTab("Aim", 4483362458)
+local CombatTab = Window:CreateTab("Combat", 4483362458)
+
+-- Variáveis de controle
+local aimOn = false
+local hitboxOn = false
+local voidFlingOn = false
 
 ------------------------------------------------
--- 1. HITBOX RGB AUTOMÁTICA
+-- 1. HITBOX RGB
 ------------------------------------------------
 local function applyHighlight(char)
     if char and not char:FindFirstChild("Highlight") then
@@ -33,7 +46,19 @@ local function applyHighlight(char)
     end
 end
 
--- Monitoramento contínuo
+VisualTab:CreateToggle({
+    Name = "🌈 RGB em Todos",
+    CurrentValue = false,
+    Callback = function(v) 
+        hitboxOn = v 
+        if not v then
+            for _, p in pairs(Players:GetPlayers()) do
+                if p.Character and p.Character:FindFirstChild("Highlight") then p.Character.Highlight:Destroy() end
+            end
+        end
+    end
+})
+
 RunService.RenderStepped:Connect(function()
     if hitboxOn then
         for _, p in pairs(Players:GetPlayers()) do
@@ -45,6 +70,8 @@ end)
 ------------------------------------------------
 -- 2. AIMBOT AUTOMÁTICO
 ------------------------------------------------
+AimTab:CreateToggle({Name = "🎯 Aimbot Automático", CurrentValue = false, Callback = function(v) aimOn = v end})
+
 RunService.RenderStepped:Connect(function()
     if aimOn then
         local closest, dist = nil, 500
@@ -65,8 +92,10 @@ RunService.RenderStepped:Connect(function()
 end)
 
 ------------------------------------------------
--- 3. VOID KILL FLING (Ao atacar)
+-- 3. VOID KILL FLING
 ------------------------------------------------
+CombatTab:CreateToggle({Name = "🥊 Arremesso p/ o Void", CurrentValue = false, Callback = function(v) voidFlingOn = v end})
+
 UserInputService.InputBegan:Connect(function(input, gpe)
     if not voidFlingOn or gpe then return end
     if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -95,4 +124,5 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     end
 end)
 
-print("FPS HUB MOBILE V7 (Sem Rayfield) Carregado!")
+Rayfield:LoadConfiguration()
+print("Menu carregado com sucesso!")
